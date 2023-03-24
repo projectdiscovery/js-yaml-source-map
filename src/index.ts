@@ -6,6 +6,7 @@ interface PathMap {
     line: number;
     position: number;
     lineStart: number;
+    lineIndent: number;
   };
 }
 
@@ -14,6 +15,7 @@ interface Fragment {
   line: number;
   position: number;
   lineStart: number;
+  lineIndent: number;
   children?: Fragment[];
 }
 
@@ -50,8 +52,8 @@ class SourceMap {
     }
     // if the path is already in the map, we don't override it
     if (!this._map[path]) {
-      const { line, position, lineStart } = fragment;
-      this._map[path] = { line, position, lineStart };
+      const { line, position, lineStart, lineIndent } = fragment;
+      this._map[path] = { line, position, lineStart, lineIndent };
     }
     // if there are children, we recursively resolve them
     if (fragment.children && fragment.children.length > 0) {
@@ -69,7 +71,7 @@ class SourceMap {
     for (let i = this._fragments.length - 1; i >= 0; i--) {
       // skip the parent and fragments not in the path
       if (
-        !this._fragments[i].path.startsWith(pathName) ||
+        !this._fragments[i].path.startsWith(pathName + ".") ||
         this._fragments[i].path === pathName
       ) {
         continue;
@@ -105,13 +107,14 @@ class SourceMap {
         // save the scalar for later, since it's not junk
         this._lastScalar = `${result as string}`;
 
-        const { line, position, lineStart } = state;
-        if (this._path.length === 0) {
+        const { line, position, lineStart, lineIndent } = state;
+        if (this._path.length === 0 || this._path.length === 1) {
           // a path of length 0 is the root, store this to the path map
           this._map["." + (result as string)] = {
             line,
             position,
             lineStart,
+            lineIndent,
           };
         } else {
           // a path of length > 1 is a child of the root, store this as a fragment
@@ -120,6 +123,7 @@ class SourceMap {
             line,
             position,
             lineStart,
+            lineIndent,
           });
         }
       } else if (kind === "mapping") {
@@ -129,6 +133,7 @@ class SourceMap {
           line: 0,
           position: 0,
           lineStart: 0,
+          lineIndent: 0,
         };
         // the fragments currently do not distinguish between keys and values, so we
         // need to use the index to determine which is which.
@@ -161,9 +166,19 @@ class SourceMap {
             newFragment.line = fragment.line;
             newFragment.position = fragment.position;
             newFragment.lineStart = fragment.lineStart;
+            newFragment.lineIndent = fragment.lineIndent;
           }
         });
         if (newFragment.children && newFragment.children.length > 0) {
+          for (const f of this._fragments) {
+            if (f.path === newFragment.path) {
+              newFragment.line = f.line;
+              newFragment.position = f.position;
+              newFragment.lineStart = f.lineStart;
+              newFragment.lineIndent = f.lineIndent;
+              break;
+            }
+          }
           this._fragments.push(newFragment);
         }
 
@@ -177,6 +192,7 @@ class SourceMap {
           line: 0,
           position: 0,
           lineStart: 0,
+          lineIndent: 0,
         };
         // discard duplicates based on position
         const seen = new Set<number>();
@@ -207,9 +223,19 @@ class SourceMap {
             newFragment.line = fragment.line;
             newFragment.position = fragment.position;
             newFragment.lineStart = fragment.lineStart;
+            newFragment.lineIndent = fragment.lineIndent;
           }
         });
         if (newFragment.children && newFragment.children.length > 0) {
+          for (const f of this._fragments) {
+            if (f.path === newFragment.path) {
+              newFragment.line = f.line;
+              newFragment.position = f.position;
+              newFragment.lineStart = f.lineStart;
+              newFragment.lineIndent = f.lineIndent;
+              break;
+            }
+          }
           this._fragments.push(newFragment);
         }
 
@@ -223,8 +249,8 @@ class SourceMap {
     if (event === "open") {
       if (this._count === 0) {
         // save the root document
-        const { line, position, lineStart } = state;
-        this._map["."] = { line, position, lineStart };
+        const { line, position, lineStart, lineIndent } = state;
+        this._map["."] = { line, position, lineStart, lineIndent };
       }
 
       // open events might have junk data, so we push the last found scalar
@@ -261,7 +287,7 @@ class SourceMap {
 
     return {
       line: pathInfo.line + 1,
-      column: pathInfo.position - pathInfo.lineStart + 1,
+      column: pathInfo.lineIndent + 1,
       position: pathInfo.position,
     };
   }
