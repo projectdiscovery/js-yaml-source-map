@@ -33,7 +33,7 @@
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:cjs": "tsc -p tsconfig.json",
     "build": "npm-run-all clean --parallel build:* && ./fixup.sh",
-    "prepare": "husky install",
+    "prepare": "npm run build",
     "release": "npm run build; release-it"
   },
   "keywords": [
